@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from routes import inventario_bp  # ✅ Importar el blueprint
+from routes import inventario_bp 
 
 app = Flask(__name__)
 

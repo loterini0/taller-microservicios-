@@ -1,2 +1,11 @@
+
 inventario-flask/firebase_config.json
-__pycache__/
+inventario-flask/__pycache__/
+inventario-flask/.env
+
+
+ventas-express/node_modules/
+ventas-express/.env
+
+gateway-laravel/.env
+gateway-laravel/vendor/
