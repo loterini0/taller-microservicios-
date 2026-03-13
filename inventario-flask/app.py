@@ -1,82 +1,23 @@
 from flask import Flask, request, jsonify
-import firebase_admin
-from firebase_admin import credentials, db
+from routes import inventario_bp  # ✅ Importar el blueprint
 
 app = Flask(__name__)
 
-cred = credentials.Certificate("firebase_config.json")
+TOKEN = "miclave123"
 
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://api-software2-default-rtdb.firebaseio.com'
-})
+@app.before_request
+def verificar_token():
+    auth_header = request.headers.get("Authorization")
 
-@app.route('/api/inventario', methods=['POST'])
-def registrar_producto():
-    data = request.json
+    if not auth_header or not auth_header.startswith("Token "):
+        return jsonify({"error": "No autorizado"}), 401
 
-    ref = db.reference('productos')
+    token = auth_header.split(" ", 1)[1]
 
-    ref.child(data['id']).set({
-        "nombre": data["nombre"],
-        "precio": data["precio"],
-        "stock": data["stock"]
-    })
+    if token != TOKEN:
+        return jsonify({"error": "No autorizado"}), 401
 
-    return jsonify({"message": "Producto registrado"})
-
-
-@app.route('/api/inventario', methods=['GET'])
-def obtener_productos():
-
-    ref = db.reference('productos')
-    productos = ref.get()
-
-    return jsonify(productos)
-
-
-
-@app.route('/api/inventario/<id>/stock', methods=['GET'])
-def verificar_stock(id):
-
-    ref = db.reference('productos').child(id)
-    producto = ref.get()
-
-    if not producto:
-        return jsonify({"error": "Producto no encontrado"}), 404
-
-    return jsonify({
-        "id": id,
-        "stock": producto["stock"]
-    })
-
-
-
-@app.route('/api/inventario/<id>/reducir', methods=['PUT'])
-def reducir_stock(id):
-
-    data = request.json
-    cantidad = data["cantidad"]
-
-    ref = db.reference('productos').child(id)
-    producto = ref.get()
-
-    if not producto:
-        return jsonify({"error": "Producto no encontrado"}), 404
-
-    if producto["stock"] < cantidad:
-        return jsonify({"error": "Stock insuficiente"}), 400
-
-    nuevo_stock = producto["stock"] - cantidad
-
-    ref.update({
-        "stock": nuevo_stock
-    })
-
-    return jsonify({
-        "message": "Stock actualizado",
-        "nuevo_stock": nuevo_stock
-    })
-
+app.register_blueprint(inventario_bp)
 
 if __name__ == '__main__':
     app.run(debug=True)

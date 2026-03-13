@@ -9,57 +9,78 @@ class VentaController extends Controller
 {
     public function registrarVenta(Request $request)
     {
-        $producto_id = $request->producto_id;
-        $cantidad = $request->cantidad;
-
         $flaskUrl = env('FLASK_URL');
         $expressUrl = env('EXPRESS_URL');
+        $token = env('MICROSERVICE_TOKEN');
 
-        $stockResponse = Http::get("$flaskUrl/api/inventario/$producto_id/stock");
+        $producto_id = $request->producto_id;
+        $cantidad = $request->cantidad;
+        $usuario = $request->usuario;
+
+        $headers = ['Authorization' => "Token $token"];
+
+
+        $stockResponse = Http::withHeaders($headers)
+            ->get("$flaskUrl/api/inventario/$producto_id/stock");
 
         if ($stockResponse->failed()) {
             return response()->json([
-                'message' => 'Error consultando inventario'
-            ], 500);
+                'message' => 'Error al consultar el inventario',
+                'detalle' => $stockResponse->body()
+            ], 502);
         }
 
-        $stock = $stockResponse->json()['stock'];
+        $data = $stockResponse->json();
+
+        if (!isset($data['stock'])) {
+            return response()->json([
+                'message' => 'Respuesta inesperada del servicio de inventario',
+                'respuesta_recibida' => $data
+            ], 502);
+        }
+
+        $stock = $data['stock'];
+
 
         if ($stock < $cantidad) {
             return response()->json([
-                'message' => 'Stock insuficiente'
+                'message' => 'Stock insuficiente',
+                'stock_disponible' => $stock,
+                'cantidad_solicitada' => $cantidad
             ], 400);
         }
 
+        $ventaResponse = Http::withHeaders($headers)
+            ->post("$expressUrl/api/ventas", [
+                'producto_id' => $producto_id,
+                'cantidad'    => $cantidad,
+                'usuario'     => $usuario
+            ]);
 
-        $ventaData = [
-            'producto_id' => $producto_id,
-            'cantidad' => $cantidad,
-            'usuario' => $request->usuario
-        ];
-
-        $expressResponse = Http::post("$expressUrl/api/ventas", $ventaData);
-
-        if ($expressResponse->failed()) {
+        if ($ventaResponse->failed()) {
             return response()->json([
-                'message' => 'Error al registrar la venta'
-            ], 500);
+                'message' => 'Error al registrar la venta',
+                'detalle' => $ventaResponse->body()
+            ], 502);
         }
 
-        $updateInventory = Http::put("$flaskUrl/api/inventario/$producto_id/reducir", [
-            'cantidad' => $cantidad
-        ]);
 
-        if ($updateInventory->failed()) {
+        $inventarioResponse = Http::withHeaders($headers)
+            ->put("$flaskUrl/api/inventario/$producto_id/reducir", [
+                'cantidad' => $cantidad
+            ]);
+
+        if ($inventarioResponse->failed()) {
             return response()->json([
-                'message' => 'Error al actualizar inventario'
-            ], 500);
+                'message' => 'Venta registrada pero error al actualizar inventario',
+                'detalle' => $inventarioResponse->body()
+            ], 502);
         }
 
         return response()->json([
-            'message' => 'Venta registrada correctamente',
-            'venta' => $expressResponse->json(),
-            'inventario' => $updateInventory->json()
-        ]);
+            'message'     => 'Venta registrada correctamente',
+            'venta'       => $ventaResponse->json(),
+            'inventario'  => $inventarioResponse->json()
+        ], 201);
     }
 }
