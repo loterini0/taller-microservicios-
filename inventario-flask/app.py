@@ -1,19 +1,23 @@
-from flask import Flask, jsonify
-import firebase_admin
-from firebase_admin import credentials, firestore
+from flask import Flask, request, jsonify
+from routes import inventario_bp  # ✅ Importar el blueprint
 
 app = Flask(__name__)
 
-cred = credentials.Certificate("firebase_config.json")
-firebase_admin.initialize_app(cred)
+TOKEN = "miclave123"
 
-db = firestore.client()
+@app.before_request
+def verificar_token():
+    auth_header = request.headers.get("Authorization")
 
-@app.route("/products")
-def products():
-    docs = db.collection("products").stream()
-    data = [doc.to_dict() for doc in docs]
-    return jsonify(data)
+    if not auth_header or not auth_header.startswith("Token "):
+        return jsonify({"error": "No autorizado"}), 401
 
-if __name__ == "__main__":
-    app.run(port=5000)
+    token = auth_header.split(" ", 1)[1]
+
+    if token != TOKEN:
+        return jsonify({"error": "No autorizado"}), 401
+
+app.register_blueprint(inventario_bp)
+
+if __name__ == '__main__':
+    app.run(debug=True)
