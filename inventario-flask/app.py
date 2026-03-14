@@ -1,9 +1,13 @@
 from flask import Flask, request, jsonify
-from routes import inventario_bp 
+from routes import inventario_bp
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
-TOKEN = "miclave123"
+TOKEN = os.getenv("API_TOKEN")
 
 @app.before_request
 def verificar_token():
